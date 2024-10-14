@@ -1,101 +1,156 @@
-import Image from "next/image";
+'use client';
+import { useState } from 'react';
+import CsvTable from './components/CsvTableComponent';
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+const Home = () => {
+    const [jsonInput, setJsonInput] = useState('');
+    const [csvOutput, setCsvOutput] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
+    const [isDarkMode, setIsDarkMode] = useState(false);
+    const [separator, setSeparator] = useState(',');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    // Função para transformar um objeto JSON em um objeto plano
+    const flattenObject = (obj: any, prefix = '', res = {} as any) => {
+        for (let key in obj) {
+            const propName = prefix ? `${prefix}.${key}` : key;
+            if (typeof obj[key] === 'object' && obj[key] !== null) {
+                flattenObject(obj[key], propName, res);
+            } else {
+                res[propName] = obj[key];
+            }
+        }
+        return res;
+    };
+
+    // Função para converter JSON para CSV
+    const convertJsonToCsv = (json: string) => {
+        try {
+            const parsedJson = JSON.parse(json);
+            
+            if (Array.isArray(parsedJson)) {
+                generatecsv(parsedJson);
+            }else{
+                for (let i = 0; i < Object.keys(parsedJson).length; i++) 
+                {
+                    let array = parsedJson[Object.keys(parsedJson)[i]];
+                   
+                    generatecsv(array); //TODO ponto de fragilidade, verificar uma forma de objetos que não são arrays serem convertidos
+                }
+            }
+
+            
+        } catch (error) {
+            setErrorMessage('JSON inválido.');
+        }
+    };
+
+    const generatecsv = (array:any) => {
+        const flattenedArray = array.map((item:any) => flattenObject(item));
+        const keys = Object.keys(flattenedArray[0]);
+        const csvRows = [keys.join(separator)];
+
+        for (const obj of flattenedArray) {
+            const values = keys.map(key => `"${obj[key] || ''}"`);
+            csvRows.push(values.join(separator));
+        }
+
+        setCsvOutput(csvRows.join('\n'));
+        setErrorMessage('');
+
+    };
+
+    // Função para baixar o arquivo CSV
+    const downloadCsv = () => {
+        if (!csvOutput) {
+            setErrorMessage('Não há CSV gerado para download.');
+            return;
+        }
+
+        const blob = new Blob([csvOutput], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+
+        link.href = url;
+        link.setAttribute('download', 'resultado.csv');
+        document.body.appendChild(link);
+        link.click();
+
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    // Função para limpar os campos
+    const clearFields = () => {
+        setJsonInput('');
+        setCsvOutput('');
+        setErrorMessage('');
+    };
+
+    const toggleTheme = () => {
+        setIsDarkMode(!isDarkMode);
+        document.documentElement.classList.toggle('dark', !isDarkMode);
+    };
+
+    return (
+        <div className={`min-h-screen p-6 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+            <button
+                onClick={toggleTheme}
+                className="mb-4 p-2 rounded-md bg-blue-500 text-white dark:bg-blue-700"
+            >
+                Alternar Tema
+            </button>
+            <h1 className="text-2xl font-bold mb-4">JSON para CSV</h1>
+            <textarea
+                placeholder="Cole o JSON aqui"
+                value={jsonInput}
+                onChange={(e) => setJsonInput(e.target.value)}
+                className="w-full p-3 mb-4 border rounded-md h-14 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <div className="mb-4">
+                <label className="mr-2">Escolha o separador:</label>
+                <select
+                    value={separator}
+                    onChange={(e) => setSeparator(e.target.value)}
+                    className="p-2 rounded-md border focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+                >
+                    <option value=",">Vírgula (,)</option>
+                    <option value=";">Ponto e vírgula (;)</option>
+                    <option value="\t">Tabulação (Tab)</option>
+                </select>
+            </div>
+            <div className="flex space-x-2 mb-4">
+                <button
+                    onClick={() => convertJsonToCsv(jsonInput)}
+                    className="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 dark:bg-green-700"
+                >
+                    Converter
+                </button>
+                <button
+                    onClick={clearFields}
+                    className="bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 dark:bg-yellow-700"
+                >
+                    Limpar
+                </button>
+                <button
+                    onClick={downloadCsv}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 dark:bg-blue-700"
+                >
+                    Baixar CSV
+                </button>
+            </div>
+            {errorMessage && <p className="text-red-500 mb-4">{errorMessage}</p>}
+            <h2 className="text-xl font-semibold mb-2">CSV</h2>
+            <textarea
+                placeholder="CSV convertido"
+                value={csvOutput}
+                readOnly
+                className="w-full h-14 p-3 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700 dark:text-white"
+            />
+            <h2 className="text-xl font-semibold mt-6 mb-2">Tabela JSON</h2>
+            <CsvTable csvData={csvOutput} separator={separator} />  {/*TODO ponto de melhoria estetica, a tabela pode ultrapassar os limites horizontais da tela */}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
-}
+    );
+};
+
+export default Home;
+
